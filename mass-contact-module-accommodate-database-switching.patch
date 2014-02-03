@@ -1,0 +1,118 @@
+diff --git a/mass_contact.info b/mass_contact.info
+index 7e01e71..6ed7917 100644
+--- a/mass_contact.info
++++ b/mass_contact.info
+@@ -4,3 +4,5 @@ description = "Enables site administrator or privileged users to send mass e-mai
+ package = "Mail"
+ core = 6.x
+ php = 4.3.5
++
++dependencies[] = db_switch
+diff --git a/mass_contact.module b/mass_contact.module
+index fb56cf1..035e57f 100644
+--- a/mass_contact.module
++++ b/mass_contact.module
+@@ -72,9 +72,11 @@ function mass_contact_perm() {
+     'send mass contact e-mails',
+   );
+ 
+-  $result = db_query('SELECT category FROM {mass_contact}');
+-  while ($category = db_fetch_object($result)) {
+-    $permissions[] = 'send to users in the '. $category->category .' category';
++  if(db_table_exists('mass_contact')) {
++    $result = db_query('SELECT category FROM {mass_contact}');
++    while ($category = db_fetch_object($result)) {
++      $permissions[] = 'send to users in the '. $category->category .' category';
++    }
+   }
+ 
+   return $permissions;
+@@ -1377,38 +1379,10 @@ function mass_contact_mail_page_submit($form, &$form_state) {
+     $roles = explode(',', $contact->recipients);
+     foreach ($roles as $r) {
+       if ($r == 2) { // all users
+-        $recipients = db_query("SELECT name, mail, uid FROM {users} WHERE status <> %d AND uid > %d", 0, 0);
+-        while ($obj = db_fetch_object($recipients)) {
+-          $rname = $obj->name;
+-          $rmail = $obj->mail;
+-          $ruid = $obj->uid;
+-          if ($rname != $user->name && !$uidooa[$ruid]) {
+-//          if (!$uidooa[$ruid]) {
+-            $recipientouta[$rname] = $rmail;
+-          }
+-        }
+-        break;
++        $recipientouta = _mass_contact_db_switch();
+       }
+       else {
+-        // Get from users_roles, then role -> user.
+-        $uids = db_query("SELECT ur.uid FROM {users_roles} ur LEFT JOIN {users} u ON ur.uid = u.uid WHERE ur.rid = %d AND u.status <> %d", $r, 0);
+-        while ($obj = db_fetch_object($uids))  {
+-          $ruid = $obj->uid;
+-          $userobj = db_fetch_object(db_query("SELECT name, mail FROM {users} WHERE uid = %d", $ruid));
+-          $rname = $userobj->name;
+-          $rmail = $userobj->mail;
+-          if (isset($uidooa[$ruid])) {
+-            if ($rname != $user->name && !$uidooa[$ruid]) {
+-//            if (!$uidooa[$ruid]) {
+-              $recipientouta[$rname] = $rmail;
+-            }
+-          }
+-          else {
+-            if ($rname != $user->name) {
+-              $recipientouta[$rname] = $rmail;
+-            }
+-          }
+-        }
++        $recipientouta = _mass_contact_db_switch($r);
+       }
+     }
+ 
+@@ -1825,3 +1799,47 @@ function _mass_contact_mail($module, $key, $to, $language, $params = array(), $f
+ 
+   return $message;
+ }  //  End of _mass_contact_mail().
++
++/*
++ * Accommodate multisite environment.
++ */
++function _mass_contact_db_switch($r='') {
++
++  $recipientouta = array();
++
++  $query = db_query("SELECT shortname FROM {drupal_site}");
++
++  while ($drupal_site = db_fetch_object($query)) {
++    $switch_db = db_switch($drupal_site->shortname);
++
++    // all users
++    if(!$r) {
++        $recipients = db_query("SELECT name, mail, uid FROM {users} WHERE status <> %d AND uid > %d", 0, 1);
++        while ($obj = db_fetch_object($recipients)) {
++          $rname = $obj->name;
++          $rmail = $obj->mail;
++          $ruid = $obj->uid;
++          if ($rname != $user->name) {
++            $recipientouta[$rname] = $rmail;
++          }
++        }
++        break;
++    }
++    else {
++        $uids = db_query("SELECT ur.uid FROM {users_roles} ur LEFT JOIN {users} u ON ur.uid = u.uid WHERE ur.rid = %d AND u.status <> %d", $r, 0);
++        while ($obj = db_fetch_object($uids))  {
++          $ruid = $obj->uid;
++          $userobj = db_fetch_object(db_query("SELECT name, mail FROM {users} WHERE uid = %d", $ruid));
++          $rname = $userobj->name;
++          $rmail = $userobj->mail;
++          if ($rname != $user->name) {
++            $recipientouta[$rname] = $rmail;
++          }
++        }
++    }
++
++    $switch_db = db_switch();
++  }
++
++  return $recipientouta;
++}
