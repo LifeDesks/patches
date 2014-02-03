@@ -1,0 +1,29 @@
+diff --git a/modules/taxonomy/taxonomy.module b/modules/taxonomy/taxonomy.module
+index 0141120..d049504 100644
+--- a/modules/taxonomy/taxonomy.module
++++ b/modules/taxonomy/taxonomy.module
+@@ -320,15 +320,6 @@ function taxonomy_save_term(&$form_values) {
+     $status = SAVED_NEW;
+   }
+ 
+-  db_query('DELETE FROM {term_relation} WHERE tid1 = %d OR tid2 = %d', $form_values['tid'], $form_values['tid']);
+-  if (!empty($form_values['relations'])) {
+-    foreach ($form_values['relations'] as $related_id) {
+-      if ($related_id != 0) {
+-        db_query('INSERT INTO {term_relation} (tid1, tid2) VALUES (%d, %d)', $form_values['tid'], $related_id);
+-      }
+-    }
+-  }
+-
+   db_query('DELETE FROM {term_hierarchy} WHERE tid = %d', $form_values['tid']);
+   if (!isset($form_values['parent']) || empty($form_values['parent'])) {
+     $form_values['parent'] = array(0);
+@@ -502,7 +493,7 @@ function taxonomy_get_vocabularies($type = NULL) {
+  *  and provide scalable alternatives.
+  */
+ function taxonomy_form_alter(&$form, $form_state, $form_id) {
+-  if (isset($form['type']) && isset($form['#node']) && (!variable_get('taxonomy_override_selector', FALSE)) && $form['type']['#value'] .'_node_form' == $form_id) {
++  if (isset($form['type']) && isset($form['#node']) && $form['type']['#value'] .'_node_form' == $form_id) {
+     $node = $form['#node'];
+ 
+     if (!isset($node->taxonomy)) {
