@@ -1,0 +1,28 @@
+diff --git a/image.install b/image.install
+index 8700f25..dd69220 100644
+--- a/image.install
++++ b/image.install
+@@ -1,5 +1,5 @@
+ <?php
+-// $Id$
++// $Id: image.install,v 1.33.2.3 2010/08/25 13:35:11 joachim Exp $
+ 
+ /**
+  * Implementation of hook_schema().
+@@ -324,10 +324,13 @@ function image_update_6100() {
+    * <http://drupal.org/node/562810>; the @ takes care of suppressing the
+    * error message this causes.
+    */
+-  @db_drop_primary_key($ret, 'image');
++  $primary_key_exists = db_result(db_query("SHOW KEYS FROM image WHERE key_name = 'PRIMARY'"));
++  if($primary_key_exists) @db_drop_primary_key($ret, 'image');
+   db_add_primary_key($ret, 'image', array('nid', 'image_size'));
+-  @db_drop_index($ret, 'image', 'image_fid');
+-  db_add_index($ret, 'image', 'fid', array('fid'));
++  $index_image_fid_exists = db_result(db_query("SHOW KEYS FROM image WHERE key_name = 'image_fid'"));
++  if($index_image_fid_exists) @db_drop_index($ret, 'image', 'image_fid');
++  $index_fid_exists = db_result(db_query("SHOW KEYS FROM image WHERE key_name = 'fid'"));
++  if(!$index_fid_exists) db_add_index($ret, 'image', 'fid', array('fid'));
+ 
+   // Notify the user that they may get harmless fail messages here.
+   $ret[] = array('success' => TRUE, 'query' => t('If you see a message of the form "Failed: ALTER TABLE {image} DROP PRIMARY KEY" or "DROP INDEX image_fid" here it is harmless.'));
