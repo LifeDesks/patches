@@ -1,0 +1,15 @@
+diff --git a/piclens.module b/piclens.module
+index 3eb75d2..0f60baf 100644
+--- a/piclens.module
++++ b/piclens.module
+@@ -215,8 +215,9 @@ function mediarssapi_format_item($item) {
+     <item>
+       <title>'. check_plain($item['title']) .'</title>
+       <link>'. $item['link']  .'</link>
++      <pubDate>' . $item['pubdate'] . '</pubDate>
+       <media:thumbnail url="'. $item['thumbnail'] .'"/>
+-      <media:content url="'. $item['content'] .'"/>
++      <media:content url="'. $item['content_url'] .'" type="'. $item['type'] .'" height="'. $item['height'] .'" width="'. $item['width'] .'" />
+     </item>
+   ';
+   return $rssitem;
