@@ -1,0 +1,71 @@
+diff --git a/oai2.module b/oai2.module
+index 5aa34d8..ce229ba 100644
+--- a/oai2.module
++++ b/oai2.module
+@@ -29,29 +29,6 @@ function oai2_help($section) {
+                 information stored by the Biblio module' );
+   }
+ }
+-function oai2_node_name($node) {
+-  return t('oai2');
+-}
+-
+-function oai2_node_info() {
+-  return array(
+-    'oai2' => array(
+-      'name' => t('OAI2 provider'),
+-      'module' => 'oai2',
+-      'description' => t('This module provides Open Archives 2 protocol access to the
+-                information stored by the Biblio module')
+-  )
+-  );
+-
+-}
+-
+-function oai2_access($op, $node) {
+-  global $user;
+-
+-}
+-
+-function oai2_perm() {
+-}
+ function oai2_cron(){
+   // cleanup expired resumption tokens
+   $expiretime = date("Y-m-d G:i:s", time()-(25*3600));
+@@ -74,7 +51,7 @@ function oai2_menu() {
+  */
+ function oai2_parse_request(){
+   global $base_url;
+-  global $compress ;
++  global $compress;
+   global $error ;
+   $compress = true;
+   $error = null;
+@@ -604,6 +581,7 @@ function oai2_list_id_rec( $args, $listrec=false){
+  	  //$record = db_fetch_object($result);
+  	  $record->biblio_contributors = biblio_load_contributors($record->vid, $record->biblio_type);
+     $record->biblio_keywords = biblio_load_keywords($record->vid);
++    $record->classification_terms = taxonomy_node_get_terms_by_vocabulary($record, CLASSIFICATION_PRIMARY);
+  	  $identifier = $oaiprefix.$record->nid;
+  	  //    	$datestamp = date("Y-m-d\TH:i:s\Z",$record->changed);
+  	  $datestamp = gmstrftime('%Y-%m-%dT%TZ',$record->changed);
+@@ -718,6 +696,7 @@ function oai2_get_record( $args){
+   if ($record = db_fetch_object($result)){
+     $record->biblio_contributors = biblio_load_contributors($record->vid, $record->biblio_type);
+     $record->biblio_keywords = biblio_load_keywords($record->vid);
++    $record->classification_terms = taxonomy_node_get_terms_by_vocabulary($record, CLASSIFICATION_PRIMARY);
+   }else{
+     $error .= oai2_oai_error('idDoesNotExist', '', $identifier);
+     return false;
+@@ -790,6 +769,11 @@ function _get_record_oai_dc($record ){
+       $output .= oai2_xmlformat($kw, 'dc:subject', '', $indent);
+     }
+   }
++  if (!empty($record->classification_terms)) {
++    foreach($record->classification_terms as $ct) {
++      $output .= oai2_xmlformat($ct->name, 'dc:subject', '', $indent);
++    }
++  }
+   if ($record->biblio_abst_e)
+   $output .= oai2_xmlformat($record->biblio_abst_e, 'dc:description', '', $indent);
+   if ($record->biblio_publisher)
