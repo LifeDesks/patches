@@ -1,0 +1,21 @@
+diff --git a/biblio_style_apa.inc b/biblio_style_apa.inc
+index 04be752..6bf896f 100644
+--- a/biblio_style_apa.inc
++++ b/biblio_style_apa.inc
+@@ -83,7 +83,8 @@ function biblio_style_apa($node, $base = 'biblio', $inline = FALSE) {
+       $output .= ($node->biblio_secondary_title) ? '<u>' . check_plain($node->biblio_secondary_title) . '. ' : '<u>';
+       $output .= ($node->biblio_volume) ? check_plain($node->biblio_volume) . ($node->biblio_issue ? '</u>(' . check_plain($node->biblio_issue) . '),&nbsp;' : ',</u> ') : '</u> ';
+       //  $output .= ($node->biblio_issue) ? '('. check_plain($node->biblio_issue).')' :'';
+-      $output .= ($node->biblio_pages) ? check_plain($node->biblio_pages) . '.' : '';
++      $output .= ($node->biblio_pages) ? check_plain($node->biblio_pages) . '. ' : '';
++      $output .= ($node->biblio_place_published && $node->biblio_publisher) ? check_plain($node->biblio_place_published) . ': ' . check_plain($node->biblio_publisher) . '.' : '';
+       break; // generic
+   }
+   /*  if ($node->biblio_date) $output .= ', '. check_plain($node->biblio_date);
+@@ -101,4 +102,4 @@ function _apa_format_author($author) {
+   $format .= !empty ($author['firstname']) ? ' ' . drupal_substr($author['firstname'], 0, 1) . '.' : '';
+   $format .= !empty ($author['initials']) ? $author['initials'] . '.' : '';
+   return $format;
+-}
+\ No newline at end of file
++}
