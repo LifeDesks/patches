@@ -1,0 +1,35 @@
+diff --git a/front_page.module b/front_page.module
+index a0e13d1..a0beb66 100644
+--- a/front_page.module
++++ b/front_page.module
+@@ -42,11 +42,11 @@ function front_page_menu() {
+     'description' => 'Specify a unique layout or splash page based on role type - override your HOME and breadcrumb links - display a custom mission style notice for users who haven\'t visited in a while - disable site and display a \'temporarily offline\' message.',
+     'page callback' => 'drupal_get_form',
+     'page arguments' => array('front_page_admin'),
+-    'access arguments' => array('administer menu'));
++    'access arguments' => array('administer frontpage'));
+   $items['front_page'] = array(
+     'title' => '',
+     'page callback' => 'front_page',
+-    'access arguments' => array('access frontpage'),
++    'access arguments' => array('access content'),
+     'type' => MENU_SUGGESTED_ITEM);
+   return $items;
+ }
+@@ -55,7 +55,7 @@ function front_page_menu() {
+  * Implementation of hook_perm.
+  */
+ function front_page_perm() {
+-  return array('access frontpage');
++  return array('administer frontpage');
+ }
+ 
+ /**
+@@ -253,7 +253,6 @@ function front_page_admin() {
+   return system_settings_form($form);
+ }
+ 
+-
+ /***********************************************
+  * Function to handle the display of the front page.
+  */

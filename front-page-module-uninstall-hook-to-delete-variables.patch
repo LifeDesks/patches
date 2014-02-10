@@ -1,0 +1,21 @@
+diff --git a/front_page.install b/front_page.install
+new file mode 100644
+index 0000000..abc01e8
+--- /dev/null
++++ b/front_page.install
+@@ -0,0 +1,14 @@
++<?php
++// $Id
++
++function front_page_install() {
++}
++
++function front_page_uninstall() {
++  for($i=1;$i<=6;$i++) {
++    variable_del('front_' . $i . '_php');
++    variable_del('front_' . $i . '_redirect');
++    variable_del('front_' . $i . '_text');
++    variable_del('front_' . $i . '_type');
++  }
++}
+\ No newline at end of file
