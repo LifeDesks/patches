@@ -1,0 +1,13 @@
+diff --git a/zen-internals/template.conditional-styles.inc b/zen-internals/template.conditional-styles.inc
+index 8211d1a..f9b3ba0 100644
+--- a/zen-internals/template.conditional-styles.inc
++++ b/zen-internals/template.conditional-styles.inc
+@@ -89,7 +89,7 @@ function _conditional_styles_theme($existing, $type, $theme, $path) {
+             }
+           }
+           if ($output) {
+-            $conditional_styles .= "<!--[$condition]>\n$output<![endif]-->\n";
++            $conditional_styles .= "<!--[$condition]\n$output<![endif]-->\n";
+           }
+         }
+       }
