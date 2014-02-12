@@ -1,0 +1,1422 @@
+diff --git a/multisite_manager.admin.inc b/multisite_manager.admin.inc
+new file mode 100644
+index 0000000..9d76fc3
+--- /dev/null
++++ b/multisite_manager.admin.inc
+@@ -0,0 +1,262 @@
++<?php
++// $Id: multisite_manager.admin.inc
++/**
++ * author: Schuyler Duveen
++ * sponsor: Columbia Univeristy Center for New Media Teaching & Learning
++ * URL: http://drupal.org/project/multisite_manager
++ * License: GPL v2 or any later version
++ *
++ */
++  global $mysql_reserve_words;
++  $mysql_reserve_words = array('ACCESSIBLE' , 'ADD' , 'ADMIN', 'ALL' , 'ALTER' , 'ANALYZE' , 'AND' , 'AS' , 'ASC' , 'ASENSITIVE' , 'BEFORE' , 'BETWEEN' ,
++							 'BIGINT' , 'BINARY' , 'BLOB' , 'BOTH' , 'BY' , 'CALL' , 'CASCADE' , 'CASE' , 'CHANGE' , 'CHAR' , 'CHARACTER' ,
++							 'CHECK' , 'COLLATE' , 'COLUMN' , 'CONDITION' , 'CONSTRAINT' , 'CONTINUE' , 'CONVERT' , 'CREATE' , 'CROSS' ,
++							 'CURRENT_DATE' , 'CURRENT_TIME' , 'CURRENT_TIMESTAMP' , 'CURRENT_USER' , 'CURSOR' , 'DATABASE' , 'DATABASES' ,
++							 'DAY_HOUR' , 'DAY_MICROSECOND' , 'DAY_MINUTE' , 'DAY_SECOND' , 'DEC' , 'DECIMAL' , 'DECLARE' , 'DEFAULT' ,
++							 'DELAYED' , 'DELETE' , 'DESC' , 'DESCRIBE' , 'DETERMINISTIC' , 'DISTINCT' , 'DISTINCTROW' , 'DIV' , 'DOUBLE' ,
++							 'DROP' , 'DUAL' , 'EACH' , 'ELSE' , 'ELSEIF' , 'ENCLOSED' , 'ESCAPED' , 'EXISTS,EXIT' , 'EXPLAIN' , 'FALSE' ,
++							 'FETCH' , 'FLOAT' , 'FLOAT4' , 'FLOAT8' , 'FOR' , 'FORCE' , 'FOREIGN' , 'FROM' , 'FULLTEXT' , 'GRANT' , 'GROUP' ,
++							 'HAVING' , 'HIGH_PRIORITY' , 'HOUR_MICROSECOND' , 'HOUR_MINUTE' , 'HOUR_SECOND' , 'IF' , 'IGNORE' , 'IN' , 'INDEX' ,
++							 'INFILE' , 'INNER' , 'INOUT' , 'INSENSITIVE' , 'INSERT' , 'INT' , 'INT1' , 'INT2' , 'INT3' , 'INT4' , 'INT8' ,
++							 'INTEGER' , 'INTERVAL' , 'INTO' , 'IS' , 'ITERATE' , 'JOIN' , 'KEY' , 'KEYS' , 'KILL' , 'LEADING' , 'LEAVE' , 'LEFT' ,
++							 'LIKE' , 'LIMIT' , 'LINEAR' , 'LINES' , 'LOAD' , 'LOCALTIME' , 'LOCALTIMESTAMP' , 'LOCK' , 'LONG' , 'LONGBLOB' ,
++							 'LONGTEXT' , 'LOOP' , 'LOW_PRIORITY' , 'MASTER_SSL_VERIFY_SERVER_CERT' , 'MATCH' , 'MEDIUMBLOB' , 'MEDIUMINT' ,
++							 'MEDIUMTEXT' , 'MIDDLEINT' , 'MINUTE_MICROSECOND' , 'MINUTE_SECOND' , 'MOD' , 'MODIFIES' , 'NATURAL' , 'NOT' ,
++							 'NO_WRITE_TO_BINLOG' , 'NULL' , 'NUMERIC' , 'ON' , 'OPTIMIZE' , 'OPTION' , 'OPTIONALLY' , 'OR' , 'ORDER' , 'OUT' ,
++							 'OUTER' , 'OUTFILE' , 'PRECISION' , 'PRIMARY' , 'PROCEDURE' , 'PURGE' , 'RANGE' , 'READ' , 'READS' , 'READ_ONLY' ,
++							 'READ_WRITE' , 'REAL' , 'REFERENCES' , 'REGEXP' , 'RELEASE' , 'RENAME' , 'REPEAT' , 'REPLACE' , 'REQUIRE' , 'RESTRICT' ,
++							 'RETURN' , 'REVOKE' , 'RIGHT' , 'RLIKE' , 'SCHEMA' , 'SCHEMAS' , 'SECOND_MICROSECOND' , 'SELECT' , 'SENSITIVE' , 'SEPARATOR' ,
++							 'SET' , 'SHOW' , 'SMALLINT' , 'SPATIAL' , 'SPECIFIC' , 'SQL' , 'SQLEXCEPTION' , 'SQLSTATE' , 'SQLWARNING' , 'SQL_BIG_RESULT' ,
++							 'SQL_CALC_FOUND_ROWS' , 'SQL_SMALL_RESULT' , 'SSL' , 'STARTING' , 'STRAIGHT_JOIN' , 'TABLE' , 'TERMINATED' , 'THEN' , 'TINYBLOB' ,
++							 'TINYINT' , 'TINYTEXT' , 'TO' , 'TRAILING' , 'TRIGGER' , 'TRUE' , 'UNDO' , 'UNION' , 'UNIQUE' , 'UNLOCK' , 'UNSIGNED' , 'UPDATE' ,
++							 'USAGE' , 'USE' , 'USING' , 'UTC_DATE' , 'UTC_TIME' , 'UTC_TIMESTAMP' , 'VALUES' , 'VARBINARY' , 'VARCHAR' , 'VARCHARACTER' ,
++							 'VARYING' , 'WHEN' , 'WHERE' , 'WHILE' , 'WITH' , 'WRITE' , 'XOR' , 'YEAR_MONTH' , 'ZEROFILL');
++
++//we need a mechanism to deal with expletives, which can be added here
++global $prohibited_words;
++$prohibited_words = array(
++	'admin', 
++	'help', 
++	'test', 
++	'mysql', 
++	'lifedesk_production', 
++	'information_schema', 
++	'edulifedesks', 
++	'svn', 
++	'testing', 
++	'maintenance',
++	'fuck',
++	'shit',
++	'bastard'
++);
++
++function multisite_manager_admin_settings_validate($form_id, $form_values) {
++  if ($form_values['module'] == 'multisite_manager') {
++    if (empty($form_values['multisite_manager_dbprefix_default']) && empty($form_values['multisite_manager_dbpath_default'])) {
++      form_set_error('multisite_manager_dbprefix_default', t('You must, at least, enter a database or table prefix string.  Both cannot be empty'));
++    }
++  }
++}
++
++function multisite_manager_admin_settings() {
++	
++  $defaults = array('db_prefix' => '',
++		    'db_path' => '{shortname}',
++		    'link' => '{shortname}.{base_url}',
++		    'admin_account' => 'copy admin',
++		    'profile' => 'default',
++		    'install_immediate' => TRUE,
++		    'run_cron' => 0,
++		    );
++  $form['multisite_manager_run_cron'] = array(
++    '#type' => 'checkbox',
++    '#title' => t('Run drupal sites\' cron jobs'),
++    '#required' => FALSE,
++    '#default_value' => variable_get('multisite_manager_run_cron', $defaults['run_cron']),
++    '#description' => t('This sets whether each drupal site\'s cron jobs will be run when this master site\'s cron is run.  If this is unset no drupal site will have their cron jobs executed regardless of each individual sites\' settings for running cron jobs.')
++  );
++  $form['multisite_manager_install_immediate'] = array(
++    '#type' => 'checkbox',
++    '#title' => t('Install site upon node creation'),
++    '#required' => FALSE,
++    '#default_value' => variable_get('multisite_manager_install_immediate', $defaults['install_immediate']),
++    '#description' => t('This sets whether Drupal site\'s creation is done upon node creation or wether it is delayed until the batch create script is run.')
++  );
++  $form['multisite_manager_dbprefix_default'] = array(
++    '#type' => 'textfield',
++    '#title' => t('Table prefix default'),
++    '#required' => FALSE,
++    '#default_value' => variable_get('multisite_manager_dbprefix_default', $defaults['db_prefix']),
++    '#description' => t('This is the default prefix that will be forced on those without "advanced database setup" rights. {shortname} stands for the shortname field input when creating the site.  If you make the default database different from the current one, you can reasonably make this empty.')
++  );
++  $form['multisite_manager_dbpath_default'] = array(
++    '#type' => 'textfield',
++    '#title' => t('Database name default'),
++    '#required' => FALSE,
++    '#default_value' => variable_get('multisite_manager_dbpath_default', $defaults['db_path']),
++    '#description' => t('If left blank, it will use the current database.  Otherwise, "{shortname}" will be replaced, so another common default might be "{shortname}_drupal". Do NOT set this unless the current database account has CREATE access in MySQL or CREATEDB access in Postgres. To ensure database data is not overwritten, if you install in another database, it is either required that your current database have some db_prefix OR that it will be a new database--i.e. that your entry here includes "{shortname}".'),
++  );
++  $form['multisite_manager_link_default'] = array(
++    '#type' => 'textfield',
++    '#title' => t('Link default'),
++    '#required' => FALSE,
++    '#default_value' => variable_get('multisite_manager_link_default', $defaults['link']),
++    '#description' => t('This is where the site will be accessible by default.  If you setup your ./sites/default/settings.php correctly along with your web server (e.g. apache/htaccess) config, you can anticipate where the new site will live and forward the user to the new site location upon creation.  Here, there are two dynamic variables, {base_url} and {shortname}.')
++  );
++  $form['multisite_manager_admin_account'] = array(
++    '#type' => 'radios',
++    '#title' => t('Admin account on new sites'),
++    '#required' => TRUE,
++    '#options' => array(
++			'copy admin' => t('Copy the admin account from this site'),
++			'copy creator' => t('Copy the account of the creator'),
++			'do nothing' => t('Do nothing (only choose this if all profiles available do something instead.  the default profile does not)'),
++			/*'prompt creator' => '',*/
++			),
++    '#default_value' => variable_get('multisite_manager_admin_account', $defaults['admin_account']),
++  );
++  $form['multisite_manager_profile_default'] = array(
++    '#type' => 'radios',
++    '#title' => t('Profile default'),
++    '#required' => FALSE,
++    '#options' => _multisite_manager_profile_options(),
++    '#default_value' => variable_get('multisite_manager_profile_default', $defaults['profile']),
++  );
++
++  $form['multisite_manager_excluded_modules'] = array(
++    '#type' => 'textarea',
++    '#title' => t('Modules to exclude'),
++    '#description' => t('List modules here that should not be installed. This is handy to prevent certain modules from being installed while testing (e.g. apachesolr). Note however that modules that do get installed cannot declare excluded modules as dependents.'),
++    '#default_value' => variable_get('multisite_manager_excluded_modules', ''),
++  );
++
++  
++
++  return system_settings_form($form);
++}
++
++/*
++ * multisite_manager_admin_file_settingsdotphp
++ * @return string of PHP code that would be included based on the default settings for link/database name
++ */
++function multisite_manager_admin_file_settingsdotphp() {
++  global $base_url;
++  $link = variable_get('multisite_manager_link_default', '');
++  ///
++  $fakenode = new stdClass();
++  $fakenode->shortname = '". $my_site_base ."';
++  $fakenode->db_prefix = variable_get('multisite_manager_dbprefix_default', '');
++  $fakenode->db_user = '';
++  $fakenode->db_pass = '<b style="color:red">DATABASE_PASSWORD</b>';
++  $fakenode->db_path = variable_get('multisite_manager_dbpath_default', '');
++  $newdb = _multisite_manager_dbobj($fakenode);
++
++  $recommended_directory = '';
++
++  if (!$link || !$fakenode->db_path) {
++    return "ERROR: no link or db url";
++  }
++  $link = str_replace('{base_url}', $base_url, $link);
++
++  //$url_pieces[2] is hostname, $url_pieces[3] is path
++  $url_pieces = explode('/', $link, 4);
++
++  $rv = array('<p>Based on your configuration in '.l( 'Multisite Manager Defaults','admin/settings/multisite_manager/defaults').' The following code should be added to a special settings.php file which .  Note, <b>This is an experimental feature</b> and you should look over this carefully before adding it in place of the database configuration (Also, please '.l('report suggestions/issues','http://drupal.org/project/multisite_manager') .').</p><blockquote><pre><code>',
++	      '$matches = FALSE;');
++
++  $host_regex = str_replace('{shortname}', '(\w+)', $url_pieces[2]);
++  $path_regex = str_replace('{shortname}', '(\w+)', $url_pieces[3]);
++
++  //assumes shortname will never be the TLD
++  $recommended_directory = preg_replace('|\(\\w\+\)[^.]*\.|','',$host_regex);
++  ///shortname in hostname
++  if (strpos($url_pieces[2],'{shortname}') !== FALSE) {
++    $rv[] = 'if (preg_match("|'. $host_regex .'|",$_SERVER["HTTP_HOST"], $matches)';
++    $rv[] = '    && preg_match("|'. $path_regex .'|",request_uri())';
++    $rv[] = '    && $matches)';
++    $rv[] = '{';
++  }///shortname in path
++  elseif (strpos($url_pieces[3],'{shortname}') !== FALSE) {
++    $rv[] = 'if (preg_match("|'. $host_regex .'|",$_SERVER["HTTP_HOST"])';
++    $rv[] = '    && preg_match("|'. $path_regex .'|",request_uri(), $matches)';
++    $rv[] = '    && $matches)';
++    $rv[] = '{';
++    $recommended_directory .= '.' . str_replace('/','.',preg_replace('|(/[^/]*)?\(\\\w\+\)([^/]*)|','',$path_regex));
++  }
++  else {
++    ///{shortname} has to appear in the link somewhere!
++    return "ERROR: shortname must be in the link template " .$url_pieces[2] .'XX' . $url_pieces[3];
++  }
++  $rv[] = '  $my_site_base = $matches[1];';
++  $rv[] = '  if(($my_site_base != \'q\'))';
++  $rv[] = '  {';
++  ///prefix
++  $rv[] = '    $db_prefix = "' . $newdb['prefix'] .'";';
++  ///needs URL structure
++  $rv[] = '    $base_url = "'. str_replace('{shortname}','". $my_site_base ."',$link) .'";  // NO trailing slash!';
++
++  ///needs newDB URI structure
++  $rv[] = '    $db_url = "' .$newdb['url'] .'";';
++
++  $rv[] = '    ///This assumes you have a ./files directory in your base drupal directory';
++  $rv[] = '    $conf = array(';
++  $rv[] = '	     "file_directory_path" => "files/".$my_site_base,';
++  $rv[] = '    );';
++  $rv[] = '  }';
++  $rv[] = '}';
++
++  $rv[] = "</code></pre></blockquote>";
++  $rv[] = 'Suggested directory under sites/ to include settings.php file: <b>' . $recommended_directory . "</b></p>";
++  return implode("\n",$rv);
++}
++
++
++// vim:fenc=utf-8:ft=php:ai:si:ts=2:sw=2:et:
++
++/**
++ * Callback to check if term actually exists
++ */
++ function multisite_manager_check_shortname($shortname=null){
++  global $mysql_reserve_words, $prohibited_words, $conf;
++  $output = '';
++  $status = TRUE;
++  $link = '';
++  $shortname = ($shortname) ? $shortname : $_REQUEST['shortname'];
++
++  $result = db_result(db_query("SELECT nid FROM drupal_site WHERE shortname = '%s'", $shortname));
++  if($result) {
++    $output = '<div class="error">' . t('The shortname you have entered, '. $shortname .', is already taken. Please use a different one.') . '</div>';
++    $status = FALSE;
++    $link = 'http://' . $shortname . '.' . $conf['_lifedesks_domain'];
++  }
++  $already_exists = db_result(@db_query("SHOW DATABASES LIKE '%s'", $shortname));
++  if($already_exists) {
++    $output = '<div class="error">' . t('The shortname you have entered, '. $shortname .', is already taken. Please use a different one.') . '</div>';
++    $status = FALSE;
++  }
++
++  foreach($mysql_reserve_words as $reserve_word) {
++    if(strtoupper($shortname) == $reserve_word) {
++      $output = '<div class="error">' . t('Please use a different shortname than ') . '"' . $shortname . '"</div>';
++      $status = FALSE;
++    }
++  }
++
++  foreach($prohibited_words as $prohibited_word) {
++    if($shortname == $prohibited_word) {
++      $output = '<div class="error">' . t('Please use a different shortname than ') . '"' . $shortname . '"</div>';
++      $status = FALSE;
++    }
++  }
++
++  if(preg_match("/^.*[^a-z].*$/",$shortname)) {
++    $status = FALSE;
++  }
++
++  if($_REQUEST['shortname']) {
++    drupal_json(array('status' => $status,'data' => $output));
++  }
++  else {
++	drupal_json(array('status' => $status, 'link' => $link));
++  }
++}
+\ No newline at end of file
+diff --git a/multisite_manager.install b/multisite_manager.install
+index 09cd88b..de83c1a 100644
+--- a/multisite_manager.install
++++ b/multisite_manager.install
+@@ -14,6 +14,13 @@ function multisite_manager_schema() {
+       'db_prefix' => array('type'=>'varchar','length'=>45, 'not null'=>TRUE, 'default'=> ''),
+       'db_user' => array('type'=>'varchar','length'=>45, 'not null'=>TRUE, 'default'=> ''),
+       'db_path' => array('type'=>'varchar','length'=>45, 'not null'=>TRUE, 'default'=> ''),
++      'mail' => array('type'=>'varchar', 'not null'=>TRUE, 'default'=> '', 'length'=>255),
++      'givenname' => array('type'=>'varchar', 'not null'=>TRUE, 'default'=> '', 'length'=>255),
++      'surname' => array('type'=>'varchar', 'not null'=>TRUE, 'default'=> '', 'length'=>255),
++      'display' => array('type' => 'int', 'default' => '1'),
++      'stats' => array('type' => 'text', 'size' => 'big'),
++      'classification' => array('type' => 'text', 'size' => 'big'),
++      'solr_hash' => array('type' => 'varchar', 'length' => 12),
+     ),
+     'indexes' => array(
+       'drupal_site_nid'    => array('nid')
+@@ -37,8 +44,54 @@ function multisite_manager_uninstall() {
+   variable_del('multisite_manager_link_default');
+ }
+ 
+-// following versioning described at: http://drupal.org/node/136078
+-// XYZZ
+-// X = Drupal major number (eg 5 = 5.x)
+-// Y = Module major number (eg 0 = 0.x, 1 = 1.x)
+-// ZZ = increment
++function multisite_manager_update_6001() {
++  $ret = array();
++
++  if (!db_column_exists('drupal_site', 'classification')) {
++    $schema = array(
++       'type'=>'text',
++       'size' => 'big',
++     );
++    db_add_field($ret, 'drupal_site', 'classification', $schema);
++  }
++  return $ret;	
++}
++
++function multisite_manager_update_6002() {
++  $ret = array();
++
++  if (!db_column_exists('drupal_site', 'solr_hash')) {
++    $schema = array(
++       'type'=>'varchar',
++       'length' => 12,
++     );
++    db_add_field($ret, 'drupal_site', 'solr_hash', $schema);
++  }
++  return $ret;	
++}
++
++function multisite_manager_update_6003() {
++	$ret = array();
++	$schema = array(
++		'type' => 'int',
++		'default' => '0',
++	);
++	db_change_field($ret, 'drupal_site', 'display', 'display', $schema);
++	
++	$ret[] = update_sql("UPDATE drupal_site SET display = 0");
++	
++	$stats = db_query("SELECT shortname, stats FROM drupal_site");
++	
++	while($site = db_fetch_array($stats)) {
++		$data = @unserialize($site['stats']);
++		if($data && $data['media']) {
++			foreach($data['media'] as $item) {
++				if($item['type'] == 'Image' && $item['count'] > 0) {
++					$ret[] = update_sql("UPDATE drupal_site SET display = 1 WHERE shortname = '".$site['shortname']."'");
++				}
++			}
++		}
++	}
++	
++	return $ret;
++}
+diff --git a/multisite_manager.module b/multisite_manager.module
+index a20c8e5..d8d35ac 100644
+--- a/multisite_manager.module
++++ b/multisite_manager.module
+@@ -2,11 +2,18 @@
+ // $Id$
+ 
+ /**
++ * Implementation of hook_perm().
++ */
++function multisite_manager_perm() {
++  return array('create drupal site', 'delete own drupal site', 'advanced database setup', 'administer multisite defaults');
++}
++
++/**
+  * author: Schuyler Duveen
+  * sponsor: Columbia Univeristy Center for New Media Teaching & Learning
+  * URL: http://drupal.org/project/multisite_manager
+  * License: GPL v2 or any later version
+- * 
++ *
+  * TODO
+  * ----
+  * test postgres
+@@ -24,8 +31,10 @@
+ function multisite_manager_help($section) {
+   switch ($section) {
+     case 'admin/help#multisite_manager':
+-    case 'admin/settings/multisite_manager':
+       return t('Multisite Manager helps create new drupal sites from within a main drupal site.  For documentation see <a href="http://drupal.org/project/multisite_manager">http://drupal.org/project/multisite_manager</a>.<p>This module is <b>NOT Plug-n-Play</b>. Before this module will work as desired follow these steps:<ol><li>Configure the Multisite Manager defaults for where new sites will be added to the database.</li><li>Make a special settings.php file in the /sites/ drupal directory. (This '. l( 'tool','admin/settings/multisite_manager/phpsettingfile') . ' will help)</li><li>Change your Apache config, probably in your Drupal .htaccess file.</li><li>For the default setup you need a symlink in your main Drupal directory.  After changing to that directory, run <code>$ ln -s . site</code></li><li>Lastly, the DB account that runs the main site must have extra DB permissions to create databases and grant privileges</li></ol></p>');
++    case 'admin/settings/multisite_manager':
++      return t('These defaults will need corresponding changes in settings.php.  Consult help for other required changes on the file system.');
++
+   }
+ }
+ 
+@@ -33,9 +42,9 @@ function multisite_manager_help($section) {
+ function multisite_manager_node_info() {
+   return array(
+     'drupal_site' => array(
+-      'name' => t('Drupal Site'),
++      'name' => t('LifeDesk'),
+       'module' => 'multisite_manager',
+-      'description' => t("Enables creation of drupal sites stored in the same database with a different prefix over the web without database info."),
++      'description' => t("This is a simple and quick method for creating a new LifeDesk."),
+     )
+   );
+ }
+@@ -44,54 +53,10 @@ function multisite_manager_node_info() {
+  * Implementation of hook_cron()
+  */
+ function multisite_manager_cron() {
+-  global $db_prefix, $conf;
+-
+-  // check if we should run sub-sites' cron jobs
+-  if (!variable_get('multisite_manager_run_cron', 0)) {
+-    return;
+-  } // end if not run cron
+-
+-  // find all drupal sites
+-  $res = db_query('SELECT `nid` FROM {node} WHERE `type` = "%s"', 'drupal_site');
+-  while ($node = db_fetch_object($res)) {
+-    $node = node_load($node->nid);
+-    
+-    // if don't run this site's cron jobs
+-    if (!$node->run_cron) {
+-      watchdog('cron', 'Skipping cron for %title.', array('%title' => $node->title));
+-    }
+-    // if run this site's cron jobs
+-    else {
+-      $node = _multisite_manager_node_url($node);
+-      $node_cron_url = $node->url . '/cron.php';
+-      /* Currently, accessing cron.php has no access restrictions,
+-       * (presumably, because the worst it could do is make something happen that should happen!)
+-       * therefore, we can do this via the cron.php url.
+-       * 
+-       * Doing so by switching DBs and through drupal_cron_run() runs into considerable issues
+-       * mostly with how module_invoke_all() and module_implements() cannot be localized.
+-       * These two methods query in-memory modules, which for our cases runs into issues when
+-       * different modules are installed in the master site vs. the sub-sites.
+-       * 
+-       * In theory, if these calls were tied to a master drupal state method, then this and other methods
+-       * like update, etc might be possible.
+-       */
+-
+-      watchdog('cron', 'Running cron for %title at "%url".', array('%title' => $node->title, '%url' => $node_cron_url));
+-      $result = drupal_http_request($node_cron_url);
+-
+-      if ($result->error) {
+-	$message = t('Error running cron for %title due to %error when accessing %url.', 
+-		     array('%title' => $node->title, 
+-			   '%error' => $result->code .' '. $result->error,
+-			   '%url' => $node_cron_url,
+-			   ));
+-	drupal_set_message($message,'error');
+-        watchdog('cron',$message, array(), WATCHDOG_WARNING);
+-      } // end if error
+-    }
+-  } // end while nodes
+-} // end function multisite_manager_cron()
++  if(module_exists('drupal_sites')) {
++    db_query("DELETE FROM {request_experts} WHERE status=2 AND created <= %d", time()-86400);
++  }
++}
+ 
+ /**
+  * Implementation of hook_view().
+@@ -102,7 +67,7 @@ function multisite_manager_view($node, $teaser = FALSE, $page = FALSE) {
+   if ($node->installed) {
+     if ($node->link) {
+       $node = _multisite_manager_node_url($node);
+-      
++
+       //header('Location: '. $url);
+       $node->content['link'] = array(
+        '#value' => theme('multisite_manager_sitelink', $node),
+@@ -125,9 +90,11 @@ function multisite_manager_menu() {
+   $items = array();
+   $items['admin/settings/multisite_manager'] = array(
+     'title' => t('Multisite Manager settings'),
++    'description' => t('Configure the database and url defaults for new sites.'),
+     'page callback' => 'drupal_get_form',
+     'page arguments' => array('multisite_manager_admin_settings'),
+     'access arguments' => array('administer multisite defaults'),
++    'file' => 'multisite_manager.admin.inc',
+     );
+   $items['admin/settings/multisite_manager/defaults'] = array(
+     'title' => t('Defaults'),
+@@ -136,13 +103,22 @@ function multisite_manager_menu() {
+     'page arguments' => array('multisite_manager_admin_settings'),
+     'access arguments' => array('administer multisite defaults'),
+     'type' => MENU_DEFAULT_LOCAL_TASK,
++    'file' => 'multisite_manager.admin.inc',
+     );
+   $items['admin/settings/multisite_manager/phpsettingfile'] = array(
+     'title' => t('settings.php help'),
+     'type' => MENU_LOCAL_TASK,
+     'description' => t('What to put in the settings.php file'),
+     'page callback' => 'multisite_manager_admin_file_settingsdotphp',
+-    'access arguments' => array('administer multisite defaults')
++    'access arguments' => array('administer multisite defaults'),
++    'file' => 'multisite_manager.admin.inc',
++    );
++  $items['check_sitename'] = array(
++    'title' => t('Multisite Manager Shortname Check'),
++    'page callback' => 'multisite_manager_check_shortname',
++    'type' => MENU_CALLBACK,
++    'access arguments' => array('access content'),
++    'file' => 'multisite_manager.admin.inc',
+     );
+   return $items;
+ }
+@@ -163,18 +139,7 @@ function multisite_manager_access($op, $node) {
+       return TRUE;
+     }
+   }
+-  
+-}
+ 
+-/**
+- * Implementation of hook_perm().
+- */
+-function multisite_manager_perm() {
+-  return array('create drupal site', 
+-	       'delete own drupal site',
+-	       'advanced database setup',
+-	       'administer multisite defaults',
+-	       );
+ }
+ 
+ function _multisite_manager_defaults() {
+@@ -217,41 +182,98 @@ function multisite_manager_form(&$node) {
+ 
+   $defaults = _multisite_manager_defaults();
+ 
+-  $form['title'] = array(
++  if (module_exists('drupal_sites')) {
++    $title = $_REQUEST['title'];
++    $shortname = $_REQUEST['shortname'];
++    $givenname = $_REQUEST['givenname'];
++    $surname = $_REQUEST['surname'];
++    $email = $_REQUEST['email'];
++    $username = $_REQUEST['username'];
++	$password = $_REQUEST['password'];
++	$md5 = $_REQUEST['md5'];
++  }
++  $form['multisite_manager'] = array(
++    '#weight' => -10,
++  );
++  $form['multisite_manager']['multisite_manager_message'] = array(
++    '#type' => 'markup',
++    '#value' => '<div id="multisite_manager_message"></div>',
++	'#weight' => -10,
++  );
++  $form['multisite_manager']['title'] = array(
+     '#type' => 'textfield',
+     '#title' => check_plain($type->title_label),
+     '#required' => TRUE,
+-    '#default_value' => $node->title,
++    '#default_value' => isset($title)?$title:$node->title,
+     '#weight' => -5
+   );
+-  $form['run_cron'] = array(
++  $form['multisite_manager']['run_cron'] = array(
+     '#type' => 'checkbox',
+     '#title' => t('Run Drupal Sites\' Cron'),
+     '#required' => FALSE,
+     '#default_value' => isset($node->run_cron)?$node->run_cron:$defaults['run_cron'],
+     '#description' => t('This sets whether this drupal site\'s cron jobs will be run when the master site\'s cron is run and is configured to trigger sites.  By default, it is set ON only if the master is configured to trigger sites.'),
+     );
+-  $form['shortname'] = array(
++  $form['multisite_manager']['shortname'] = array(
+     '#required' => TRUE,
+     '#type' => 'textfield',
+     '#title' => t('Shortname'),
+-    '#default_value' => $node->shortname,
++    '#default_value' => isset($shortname)?$shortname:$node->shortname,
+     '#size' => 15,
+     '#maxlength' => 45,
+     '#description' => t('This short name will be used in the database as a unique identifier and also possibly the default site location.  This must only be numbers and letters'),
+-    '#weight' => -4
++    '#weight' => -4,
++	'#ahah' => array(
++	  'event' => 'blur',
++	  'path' => 'check_sitename',
++	  'wrapper' => 'multisite_manager_message',
++	  'progress' => 'none',
++    ),
++  );
++  $form['multisite_manager']['givenname'] = array('#type' => 'textfield',
++    '#title' => t('Given Name'),
++    '#default_value' => isset($givenname)?$givenname:$node->givenname,
++    '#size' => 60,
++    '#required' => TRUE,
++    '#description' => t('Please enter Given Name of new LifeDesk Owner'),
++    '#weight' => -3
++  );
++  $form['multisite_manager']['surname'] = array('#type' => 'textfield',
++    '#title' => t('Last Name'),
++    '#default_value' => isset($surname)?$surname:$node->surname,
++    '#size' => 60,
++    '#required' => TRUE,
++    '#description' => t('Please enter Last Name of new LifeDesk Owner'),
++    '#weight' => -3
++  );
++  $form['multisite_manager']['mail'] = array('#type' => 'textfield',
++    '#title' => t('E-mail address of new LifeDesk Owner'),
++    '#default_value' => isset($email)?$email:$node->mail,
++    '#size' => 60,
++    '#required' => TRUE,
++    '#weight' => -2
++  );
++  $form['multisite_manager']['username'] = array('#type' => 'hidden',
++    '#title' => t('Username'),
++    '#default_value' => $username,
++  );
++  $form['multisite_manager']['password'] = array('#type' => 'hidden',
++    '#title' => t('Password'),
++    '#default_value' => $password,
+   );
+-  
+-  $form['profile'] = array(
++  $form['multisite_manager']['md5'] = array('#type' => 'hidden',
++    '#title' => t('md5'),
++    '#default_value' => $md5,
++  );
++  $form['multisite_manager']['profile'] = array(
+     '#type' => 'radios',
+     '#title' => t('Profile'),
+     '#required' => TRUE,
+     '#options' => _multisite_manager_profile_options(),//array_combine($profiles,$profiles),
+-    '#default_value' => $defaults['profile'],
+-    '#weight' => -2
++    '#default_value' => isset($node->profile)?$node->profile:$defaults['profile'],
++    '#weight' => -1
+   );
+-
+-  $form['advanced'] = array(
++  $form['multisite_manager']['advanced'] = array(
+     '#type' => 'fieldset',
+     '#title' => t('Advanced'),
+     '#collapsible' => TRUE,
+@@ -259,21 +281,21 @@ function multisite_manager_form(&$node) {
+     '#access' =>user_access('advanced database setup'),
+     '#description' => t('Once created, modifying these values will not do anything except change the local record.  If you need to move the database around, you must do it yourself through the database.  Then update the record here.'),
+   );
+-   $form['advanced']['link'] = array(
++   $form['multisite_manager']['advanced']['link'] = array(
+     '#type' => 'textfield',
+     '#title' => t('Site Link'),
+     '#default_value' => isset($node->link)?$node->link:$defaults['link'],
+     '#required' => FALSE,
+     '#access' =>user_access('advanced database setup'),
+     );
+-   $form['advanced']['db_prefix'] = array(
++   $form['multisite_manager']['advanced']['db_prefix'] = array(
+     '#type' => 'textfield',
+     '#title' => t('Table prefix'),
+     '#default_value' => isset($node->db_prefix)?$node->db_prefix:$defaults['db_prefix'],
+     '#required' => FALSE,
+     '#access' =>user_access('advanced database setup'),
+     );
+-   $form['advanced']['db_user'] = array(
++   $form['multisite_manager']['advanced']['db_user'] = array(
+     '#type' => 'textfield',
+     '#title' => t('Database username'),
+     '#default_value' => isset($node->db_user)?$node->db_user:$defaults['db_user'],
+@@ -281,14 +303,14 @@ function multisite_manager_form(&$node) {
+     '#access' =>user_access('advanced database setup'),
+     '#description' => t('Do NOT set this unless your current database account has GRANT option in MySQL or CREATEUSER in Postgres.'),
+     );
+-   $form['advanced']['db_pass'] = array(
++   $form['multisite_manager']['advanced']['db_pass'] = array(
+     '#type' => 'password',
+     '#title' => t('Database password'),
+     '#default_value' => $defaults['db_pass'],
+     '#required' => FALSE,
+     '#access' =>user_access('advanced database setup'),
+     );
+-   $form['advanced']['db_path'] = array(
++   $form['multisite_manager']['advanced']['db_path'] = array(
+     '#type' => 'textfield',
+     '#title' => t('Database name'),
+     '#size' => 45,
+@@ -302,17 +324,17 @@ function multisite_manager_form(&$node) {
+    //is there a better way so only people with access can set these items?
+    /*
+    if (!user_access('advanced database setup')) {
+-     $form['advanced']['db_prefix']['#value'] = $defaults['db_prefix'];
+-     $form['advanced']['db_user']['#value'] = $defaults['db_user'];
+-     $form['advanced']['db_pass']['#value'] = $defaults['db_pass'];
+-     $form['advanced']['db_path']['#value'] = $defaults['db_path'];
+-     $form['advanced']['link']['#value'] = $defaults['link'];
+-
+-     $form['advanced']['db_prefix']['#type'] = 'hidden';
+-     $form['advanced']['db_user']['#type'] = 'hidden';
+-     $form['advanced']['db_pass']['#type'] = 'hidden';
+-     $form['advanced']['db_path']['#type'] = 'hidden';
+-     $form['advanced']['link']['#type'] = 'hidden';
++     $form['multisite_manager']['advanced']['db_prefix']['#value'] = $defaults['db_prefix'];
++     $form['multisite_manager']['advanced']['db_user']['#value'] = $defaults['db_user'];
++     $form['multisite_manager']['advanced']['db_pass']['#value'] = $defaults['db_pass'];
++     $form['multisite_manager']['advanced']['db_path']['#value'] = $defaults['db_path'];
++     $form['multisite_manager']['advanced']['link']['#value'] = $defaults['link'];
++
++     $form['multisite_manager']['advanced']['db_prefix']['#type'] = 'hidden';
++     $form['multisite_manager']['advanced']['db_user']['#type'] = 'hidden';
++     $form['multisite_manager']['advanced']['db_pass']['#type'] = 'hidden';
++     $form['multisite_manager']['advanced']['db_path']['#type'] = 'hidden';
++     $form['multisite_manager']['advanced']['link']['#type'] = 'hidden';
+    }
+    */
+ 
+@@ -325,22 +347,39 @@ function multisite_manager_form(&$node) {
+ function multisite_manager_validate(&$node) {
+   global $locale, $multisite_manager_installmodules;
+   include_once './includes/install.inc';
++  $path = drupal_get_path('module', 'multisite_manager') . '/';
++  include_once $path.'multisite_manager.admin.inc';
+ 
+-  if (!preg_match('/^[A-Za-z0-9_]+$/', $node->shortname)) {
+-    form_set_error('shortname', t('The database table prefix you have entered, %shortname, is invalid. The table prefix can only contain alphanumeric characters, underscores or dots.', array('%shortname' => $node->shortname)), 'error');
++  if (!preg_match('/^[a-z]+$/', $node->shortname)) {
++    form_set_error('shortname', t('The shortname you have entered, %shortname, is invalid. The shortname can only contain lowercase letters.', array('%shortname' => $node->shortname)), 'error');
+   }
++
+   if (!$node->nid) {//expected to be NULL if a new node
+     ///if new drupal site, we check to see if the site is already entered
+     ///we don't do this on updates, because maybe the DB admin moved the site manually and is just updating the record
+ 
+-    $already_exists = db_result(@db_query("SELECT shortname FROM {drupal_site} WHERE shortname = '%s'",$node->shortname));
++    $already_exists = db_result(@db_query("SELECT shortname FROM {drupal_site} WHERE shortname = '%s' AND profile = '%s'",$node->shortname, $node->profile));
+     if ($already_exists) {
+       form_set_error('shortname', t('The shortname you have entered, %shortname, is already taken. Please use a different one.', array('%shortname' => $node->shortname)), 'error');
+     }
+     if (_multisite_manager_dbexists($node)) {
+       form_set_error('shortname', t('The database location the site would be installed already exists. Please use a different shortname or database path and prefix.'), 'error');
+     }
++
++	global $mysql_reserve_words;
++	foreach($mysql_reserve_words as $reserve_word) {
++      if(strtoupper($node->shortname) == $reserve_word) {
++        form_set_error('shortname', t('You are not authorised to create a LifeDesk with the shortname %shortname', array('%shortname' => $node->shortname)), 'error');
++	  }
++	}
++  }
++
++  /* Validating the email address - Start */
++  if(!multisite_manager_valid_email($node->mail)) {
++  //if ($error = user_validate_mail($node->mail)) {
++    form_set_error('mail', 'Please enter a valid email address!');
+   }
++  /* Validating the email address - End */
+ 
+   $multisite_manager_installmodules = drupal_verify_profile($node->profile, $locale);
+   if (!$multisite_manager_installmodules) {
+@@ -356,11 +395,15 @@ function multisite_manager_validate(&$node) {
+ 	|| $node->db_path != $defaults['db_path']
+ 	|| $node->link != $defaults['link']
+ 	) {
+-    form_set_error('shortname', t('Just use shortname.  You do not have access to modify the database settings directly.  If this is necessary, please contact your drupal site administrator.'), 'error');
++    form_set_error('shortname', t('Just use shortname.  You do not have access to modify the database settings directly.  If this is necessary, please contact your Drupal site administrator.'), 'error');
+     }
+   }
+ }
+ 
++function multisite_manager_valid_email($str) {
++  return ( ! preg_match("/^([a-z0-9\+_\-]+)(\.[a-z0-9\+_\-]+)*@([a-z0-9\-]+\.)+[a-z]{2,6}$/ix", $str)) ? FALSE : TRUE;
++}
++
+ function install_no_profile_error() {
+   //this function is required by drupal_verify_profile()
+   //It should probably do something smarter here.
+@@ -390,7 +433,7 @@ function _multisite_manager_unparse_dburl($db) {
+  * Returns an associative array for the $node that
+  * _multisite_manager_unparse_dburl() can turn into a database url
+  * or be passed to _multisite_manager_dbswitch()
+- */ 
++ */
+ function _multisite_manager_dbobj($node) {
+   global $db_url;
+   $cur_db = parse_url(is_array($db_url) ? $db_url['default'] : $db_url);
+@@ -463,12 +506,14 @@ function _multisite_manager_dbswitch($new_db) {
+  * Until this is in the db_* api..., return the error text from the last database query
+  */
+ function _multisite_manager_db_error_message() {
++
+   switch ($GLOBALS['db_type']) {
+-    case 'mysql': 
++    case 'mysql':
+       return mysql_error();
+-    case 'mysqli': 
+-      return mysqli_error(db_set_active());
+-    case 'pgsql': 
++    case 'mysqli':
++      global $active_db;
++      return mysqli_error($active_db);
++    case 'pgsql':
+       return pg_last_error();
+   }
+ }
+@@ -479,9 +524,10 @@ function _multisite_manager_db_error_message() {
+ function _multisite_manager_dbexists($node) {
+   global $db_prefix;
+   $new_db = _multisite_manager_dbobj($node);
++
+   $already_exists = FALSE;
+   switch ($GLOBALS['db_type']) {
+-    case 'mysql': 
++    case 'mysql':
+     case 'mysqli':
+       $already_exists = db_result(@db_query("SHOW DATABASES LIKE '%s'", $new_db['path']));
+       if ($already_exists) {
+@@ -519,7 +565,7 @@ function _multisite_manager_newdb($new_db) {
+     ///if it already exists, then some error will return, but who cares?
+     ///Actually, we DO care, because if it creates a new db here, we'll
+     ///  delete it on node deletion
+-    ///in MYSQL you need the 'CREATE' privilege.  
++    ///in MYSQL you need the 'CREATE' privilege.
+     ///in POSTGRES you need the 'CREATEDB' privilege
+     #$create_req = 'CREATE DATABASE ';
+     #if (strpos($GLOBALS['db_type'], 'mysql') !== FALSE) {
+@@ -530,14 +576,21 @@ function _multisite_manager_newdb($new_db) {
+ 
+     if ($errors === 1007) {
+       ///This is ok, maybe we put all the new databases in one other db
+-      drupal_set_message("Database already existed");
+-    } 
++      drupal_set_message("Database already exists");
++    }
+     elseif ($errors) {
+       //what's 1004: access denied!
+-      //needs GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, INDEX,                 ALTER, CREATE TEMPORARY TABLES, LOCK TABLES  on *.* to 'drupaluser'@'localhost' identified by '*****' with grant option;
++      //needs GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, INDEX, ALTER, CREATE TEMPORARY TABLES, LOCK TABLES  on *.* to 'drupaluser'@'localhost' identified by '*****' with grant option;
+       drupal_set_message("Database error when creating database: $errors", 'error');
+       return FALSE;
+     }
++    elseif (!$errors) {
++      // for creation of required folders & modifying permissions on them for each site to store uploaded files, pictures etc.
++      mkdir(getcwd()."/files/".$new_db['path']);
++      chmod(getcwd()."/files/".$new_db['path'], 0777);
++      mkdir(getcwd()."/files/".$new_db['path']."/pictures");
++      chmod(getcwd()."/files/".$new_db['path']."/pictures", 0777);
++    }
+   }
+   /**
+    * I was tempted to change user only if there's a new database
+@@ -547,27 +600,27 @@ function _multisite_manager_newdb($new_db) {
+    */
+ 
+   switch ($GLOBALS['db_type']) {
+-    case 'mysql': 
+-    case 'mysqli': 
++    case 'mysql':
++    case 'mysqli':
+       //do if new user AND new db
+       if ($new_db['user'] != $cur_db['user'] && $new_db['new']) {
+ 	//current user needs GRANT OPTION privilege
+         @db_query("
+-          GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, INDEX, 
++          GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, INDEX,
+                 ALTER, CREATE TEMPORARY TABLES, LOCK TABLES
+                 ON %s.*
+                 TO '%s'@'%s' IDENTIFIED BY '%s'
+           ", $new_db['path'], $new_db['user'], $new_db['host'], $new_db['pass']);
+       }
+       break;
+-    case 'pgsql': 
++    case 'pgsql':
+       if ($new_db['user'] != $cur_db['user']) {//only if diff user
+ 	//current user needs CREATEUSER privilege
+         @db_query("
+           CREATE USER %s ".
+ 	  ($new_db['pass'])?" WITH PASSWORD '%s'":"%s".
+-        " NOCREATEDB 
+-          NOCREATEUSER 
++        " NOCREATEDB
++          NOCREATEUSER
+         ", $new_db['user'], $new_db['pass']);
+       }
+       break;
+@@ -586,17 +639,28 @@ function multisite_manager_insert($node) {
+   $install_immediately = variable_get('multisite_manager_install_immediate', TRUE);
+   //Store some info about the new site in the main site.
+   //Note that we DO NOT store the password
+-  db_query("INSERT INTO {drupal_site} (vid, nid, shortname,  profile, link, installed, run_cron, db_prefix, db_user, db_path) VALUES (%d, %d, '%s', '%s', '%s', %d, %d, '%s', '%s', '%s')", $node->vid, $node->nid, $node->shortname, $node->profile, $node->link, $install_immediately, $node->run_cron, $node->db_prefix, $node->db_user, $node->db_path);
+-  
++  db_query("INSERT INTO {drupal_site} (vid, nid, shortname,  profile, link, installed, run_cron, db_prefix, db_user, db_path, mail, givenname, surname) VALUES (%d, %d, '%s', '%s', '%s', %d, %d, '%s', '%s', '%s', '%s', '%s', '%s')", $node->vid, $node->nid, $node->shortname, $node->profile, $node->link, $install_immediately, $node->run_cron, $node->db_prefix, $node->db_user, $node->db_path, $node->mail, $node->givenname, $node->surname);
++  if (module_exists('drupal_sites')) {
++    db_query("UPDATE {request_experts} SET status=1 WHERE md5='%s'", $node->md5);
++  }
++
+   if ($install_immediately) {
+     multisite_manager_install_site($node);
+   }
+-  
++
++  $database = $node->shortname;
++
++  $created = db_result(@db_query("SHOW DATABASES LIKE '%s'", $database));
++
++  if (module_exists('drupal_sites') && $created) {
++    db_query("UPDATE {request_experts} SET status=2 WHERE md5='%s'", $node->md5);
++  }
++
+ }
+ 
+ function multisite_manager_install_site($node) {
+   /**
+-   * 
++   *
+    *  1. If it's a different database and/or user from the current
+    *     then creates them (assumes db access to do so)
+    *  2. switches to the new context (db,user,table prefix)
+@@ -605,24 +669,31 @@ function multisite_manager_install_site($node) {
+    */
+   global $multisite_manager_installmodules, $db_prefix, $conf, $locale, $user;
+ 
+-  if (!$multisite_manager_installmodules) {  
++  if (!$multisite_manager_installmodules) {
+     ///if this function is run by a script, then _validate() won't have
+     /// been called
+     $multisite_manager_installmodules = drupal_verify_profile($node->profile, $locale);
+-    if (!$multisite_manager_installmodules) { 
++    if (!$multisite_manager_installmodules) {
+       echo "\n" . t("One or more required modules are missing!") . "\n";
+       exit();
+     }
+   }
+ 
++  //learn if there is an existing message on all sites such that newly created sites won't slip through the cracks
++  $site_message = variable_get('lifedesk_announcements','');
++  $site_version = variable_get('lifedesk_version', 'x');
++
++  $from = variable_get('site_mail', 'lifedesk@eol.org');
+   ///get user for admin account
+-  $admin_how = variable_get('multisite_manager_admin_account', 'copy creator');
++  $current_user = $user->givenname;
++
++  $admin_how = variable_get('multisite_manager_admin_account', 'copy admin');
+   switch($admin_how) {
+-  case 'copy admin':
+-    $account = user_load(1);
+-    break;
+-  case 'copy creator':
+-    $account = $user;
++    case 'copy admin':
++      $account = user_load(1);
++      break;
++    case 'copy creator':
++      $account = $user;
+   }
+ 
+   #$multisite_manager_installmodules = drupal_verify_profile($node->profile, $locale);
+@@ -631,7 +702,7 @@ function multisite_manager_install_site($node) {
+ 
+   /**
+    * creates database and user w/ permissions if necessary
+-   * _newdb returns the db_url for the new site based on 
++   * _newdb returns the db_url for the new site based on
+    * the $node's arguments.
+    *
+    * The simplest case would be returning the same url as
+@@ -663,25 +734,89 @@ function multisite_manager_install_site($node) {
+   #install_tasks($node->profile, $task); //can't use this
+ 
+   ///THEFT (install.php)
+-  drupal_install_modules($multisite_manager_installmodules);
++  $excluded_modules = preg_split("/[\s\n,;]+/",variable_get('multisite_manager_excluded_modules',''));
++  $diff = array_merge(array_diff($multisite_manager_installmodules, $excluded_modules));
++  drupal_install_modules($diff);
+ 
+   /*BEGIN THEFT*/
+   //TODO: install locale stuff
+   /*END THEFT (install.php) */
++  if($node->password) {
++    $newusername = $node->name;
++    $encrypted_pass = $node->password;
++  } else {
++    $newusername = 'Administrator';
++    $newpass = user_password();
++    $encrypted_pass = md5($newpass);
++  }
++  //$newpass = $node->password ? $node->password : user_password();
++  $username = $node->username ? $node->username : 'Administrator';
++
++  ///TASK 'configure' (superadmin and owner account)
++  $ret = array();
++  $timestamp = time();
++  switch ($admin_how) {
++    case 'do nothing':
++      break;
++    case 'copy admin':
++      //change username of creator if matches username of superadmin account
++      if($username == $account->name) {
++        $username = 'administrator';
++      }
++      $ret[] = db_query("UPDATE {users} SET name = '%s', givenname = '%s', surname = '%s', pass = '%s', mail = '%s', status = 1 WHERE uid = 1", $account->name, $account->givenname, $account->surname, $account->pass, $account->mail);
++      $ret[] = db_query("INSERT INTO {users} (name, givenname, surname, pass, mail, created, status) VALUES ('%s', '%s', '%s', '%s', '%s', %d, 1)", $username, $node->givenname, $node->surname, $encrypted_pass, $node->mail, $timestamp);
++      break;
++    case 'copy creator':
++      $ret[] = db_query("UPDATE {users} SET name = '%s', givenname = '%s', surname = '%s', pass = '%s', mail = '%s', status = 1 WHERE uid = 1", $username, $node->givenname, $node->surname, $encrypted_pass, $node->mail);
++      break;
++  }
++  //get site creator (owner) uid
++  $owner_uid = db_result(db_query("SELECT uid FROM users WHERE name = '%s'", $username));
++  // SET variable 'site_owner_uid'
++  variable_set("site_owner_uid", $owner_uid);
++
++  /**
++   * TODO: error handling for configuring super admin and owner accounts?
++ */
+ 
+-  ///TASK 'configure' (admin account)
+-  if ($admin_how !== 'do nothing') {
+-    ///THEFT (install.php)
+-    $newsite_account = user_load(1);
+-    user_save($newsite_account, array('name' => $account->name,
+-				      'mail' => $account->mail,
+-				      'roles' => array(), 
+-				      'status' => 1,
+-				      ) );
+-    //no save password raw function :-(
+-    $success = db_query("UPDATE {users} SET pass = '%s' WHERE uid = 1", array($account->pass));
++/*
++  foreach($ret as $k => $v) {
++    switch($k) {
++      case 'success':
++        if(!$v) {
++          //error occurred -what should we do with this error?
++        }
++    }
++  }
++*/
++
++  $edit_url = url($path = 'user/'.$owner_uid.'/edit', $options = array('fragment' => '', 'query' => '', 'absolute' => TRUE, 'alias' => FALSE, 'prefix' => ''));
++  $edit_url = str_replace('?q=','', $edit_url);
++  $edit_url = str_replace('admin',$node->shortname,$edit_url);
++  $newsite_url = str_replace('user/'.$owner_uid.'/edit','', $edit_url);
++
++  $variables = array(
++  '!givenname' => $node->givenname,
++  '!username' => $newusername,
++  '!site' => $new_db['path'],
++  '!site_name' => $node->title,
++  '!password' => $newpass,
++  '!uri' => $newsite_url,
++  '!edit_uri' => $edit_url,
++  '!current_user' => $current_user,
++  );
++
++  $params['subject'] = t("A LifeDesk has been created for you"); //subject
++  $params['body'] = t("Dear !givenname,\n\nA LifeDesk '!site_name' has been created and is accessible at !uri\nYou are the administrator of this LifeDesk. You may login using the following username and password:\n\n  username: !username\n  password: !password\n\nYou may later change both the username and password in your account.\n\n- The LifeDesk Team", $variables); //mail body
++
++  //only send mail when form submitted directly and not via the marketing page
++  if(!$node->username) {
++	drupal_mail('multisite_manager', 'direct', $node->mail, user_preferred_language($user), $params, $from);
+   }
+ 
++  $params['subject'] = t("LifeDesk '!site_name' has been created!",$variables);
++  $params['body'] = t("Dear !current_user,\n\n You have created LifeDesk '!site_name' accessible at !uri\n\n- The LifeDesk Team", $variables);
++  drupal_mail('multisite_manager', 'direct', $from, user_preferred_language($user), $params, $from);
+ 
+   //after install_profile, because otherwise {cache} and {variable} don't exist yet
+   variable_init(); //soak up anything from {variable}
+@@ -689,7 +824,7 @@ function multisite_manager_install_site($node) {
+   /*BEGIN THEFT*/
+   //TODO: call profile tasks
+ 
+-  // Show profile finalization info. 
++  // Show profile finalization info.
+   $function = $node->profile.'_profile_tasks';
+   if (function_exists($function)) {
+     // More steps required
+@@ -715,17 +850,23 @@ function multisite_manager_install_site($node) {
+   actions_synchronize();
+   // Store install profile for later use.
+   variable_set('install_profile', $node->profile);
++  variable_set('site_mail', $node->mail);
++  variable_set('shortname', $node->shortname);
++  variable_set('site_name', $node->title);
++  variable_set('lifedesk_announcements', $site_message);
++  variable_set('lifedesk_version', $site_version);
++
+   /*END THEFT (install.php)*/
+ 
+   if ($new_db['new'] && $new_db['prefix'] != $db_prefix) {
+     ///OK, time to rename all the tables that were just created
+     ///Is this hacky or what!?!?!
+ 
+-    ///PARANOIA.  We switch AGAIN to make ABSOLUTELY SURE we don't 
++    ///PARANOIA.  We switch AGAIN to make ABSOLUTELY SURE we don't
+     ///              go and rename the tables of the CURRENT DATABASE
+     $mid_cur_db = _multisite_manager_dbswitch($new_db);
+ 
+-    drupal_set_message('Renaming tables in the new database.');
++    //drupal_set_message('Renaming tables in the new database.');
+     $result = _multisite_manager_tables_result($db_prefix);
+ 
+     if ($cur_db['url'] != $mid_cur_db['url']) {
+@@ -741,6 +882,16 @@ function multisite_manager_install_site($node) {
+ 
+     $db_prefix = $cur_db['prefix'];
+   }
++
++  //execute flush_caches on site to ensure all is well. Only works with wildcard DNS or if hosts file entry already exists
++  global $base_url;
++  $url_parts = parse_url_domain($base_url);
++  @do_get_request('http://' . $node->shortname . '.' . $url_parts[1] . '.' . $url_parts[2] . '/flush_caches');
++
++  //get the Apache Solr hash and add to table
++  $solr = db_result(db_query("SELECT value FROM variable WHERE name='apachesolr_site_hash'"));
++  $solr = ($solr) ? unserialize($solr) : '';	
++
+   /* SWITCH BACK TO OLD DB */
+   _multisite_manager_dbswitch($cur_db);
+ 
+@@ -757,6 +908,33 @@ function multisite_manager_install_site($node) {
+     drupal_set_message($profile_message);
+   }
+ 
++  if (module_exists('drupal_sites')) {
++    db_query("UPDATE {drupal_site} SET solr_hash='%s' WHERE shortname='%s'", $solr, $node->shortname);
++  }
++
++}
++
++function parse_url_domain ($url) {
++ $parsed = parse_url($url);
++ $parts = explode('.',$parsed['host']);
++ return $parts;
++}
++
++/**
++ * Function to perform a http get
++*/
++function do_get_request($url) {
++     $params = array('http' => array(
++                  'method' => 'GET',
++                  'content' => ''
++               ));
++     if ($optional_headers !== null) {
++        $params['http']['header'] = $optional_headers;
++     }
++     $ctx = stream_context_create($params);
++     $fp = @fopen($url, 'rb', false, $ctx);
++     $response = @stream_get_contents($fp);
++     return;
+ }
+ 
+ /**
+@@ -764,15 +942,15 @@ function multisite_manager_install_site($node) {
+  */
+ function multisite_manager_update($node) {
+   if (user_access('advanced database setup')) {
+-    db_query("UPDATE {drupal_site} SET 
++    db_query("UPDATE {drupal_site} SET
+               link = '%s', shortname = '%s', run_cron = '%d', db_prefix = '%s', db_user = '%s', db_path = '%s'
+-              WHERE vid = %d", 
+-	     $node->link, 
+-	     $node->shortname, 
+-	     $node->run_cron, 
+-	     $node->db_prefix, 
+-	     $node->db_user, 
+-	     $node->db_path, 
++              WHERE vid = %d",
++	     $node->link,
++	     $node->shortname,
++	     $node->run_cron,
++	     $node->db_prefix,
++	     $node->db_user,
++	     $node->db_path,
+ 	     $node->vid);
+     if ($node->db_pass) {
+       db_query("UPDATE {drupal_site} SET db_pass = '%s' WHERE vid = %d", $node->db_pass, $node->vid);
+@@ -793,11 +971,11 @@ function _multisite_manager_tables_result($prefix) {
+      * while we're switched (and {session} in one use case is being deleted!!).
+      */
+   switch ($GLOBALS['db_type']) {
+-    case 'mysql': 
++    case 'mysql':
+     case 'mysqli':
+       $result = @db_query("SHOW TABLES LIKE '%s%%'", str_replace('_','\_',$prefix));
+       break;
+-    case 'pgsql': 
++    case 'pgsql':
+       $result = @db_query("SELECT relname FROM pg_stat_user_tables WHERE relname LIKE '%s%%'", str_replace('_','\_',$prefix));
+       break;
+   }
+@@ -818,7 +996,12 @@ function multisite_manager_delete($node) {
+     site, and we can just delete the whole thing.
+   */
+   if (strpos($node->db_path,'{shortname}') !== FALSE) {
+-    db_query('DROP DATABASE %s',str_replace('{shortname}', $node->shortname, $node->db_path));
++    $database = $node->shortname;
++    db_query('DROP DATABASE %s',$database);
++
++    if (module_exists('drupal_sites')) {
++      db_query("DELETE FROM {request_experts} WHERE url_requested='%s'",$node->shortname);
++    }
+   }
+   elseif (strpos($node->db_prefix,'{shortname}') !== FALSE) {
+     $new_db =_multisite_manager_dbobj($node);
+@@ -844,175 +1027,63 @@ function multisite_manager_delete($node) {
+ 
+   ///Finally, delete from our own records
+   db_query("DELETE FROM {drupal_site} WHERE vid = %d", $node->vid);
++
++  global $user;
++  $current_user = $user->givenname;
++
++  $variables = array(
++  '!site_name' => $node->title,
++  '!current_user' => $current_user,
++  );
++
++  $recipient = variable_get('site_mail', 'lifedesk@eol.org');
++  $params['subject'] = t("LifeDesk '!site_name' has been deleted!",$variables);
++  $params['body'] = t("Dear !current_user,\n\nYou have deleted LifeDesk '!site_name' successfully!\n\n- The LifeDesk Team", $variables);
++  drupal_mail('multisite_manager', 'direct', $recipient, user_preferred_language($user), $params, $recipient);
+ }
+ 
+ /**
+- * Implementation of hook_load().
++ * For deletion of folders after subsite deletion. - Start
++ * Usually we can't remove a directory using 'rmdir', if it is not empty.
++ * This is a recursive function written for deleting a folder which is not empty.
+  */
+-function multisite_manager_load($node) {
+-  $additions = db_fetch_object(db_query('SELECT shortname, profile, link, installed, run_cron, db_prefix, db_user, db_path FROM {drupal_site} WHERE vid = %d', $node->vid));
+-  return $additions;
+-}
+-
+-function multisite_manager_admin_settings_validate($form_id, $form_values) {
+-  if ($form_values['module'] == 'multisite_manager') {
+-    if (empty($form_values['multisite_manager_dbprefix_default']) && empty($form_values['multisite_manager_dbpath_default'])) {
+-      form_set_error('multisite_manager_dbprefix_default', t('You must, at least, enter a database or table prefix string.  Both cannot be empty'));
++function multisite_manager_deltree($f) {
++  if (is_dir($f)) {
++    if (is_file("$f/.htaccess")) {
++      chmod($f .'/.htaccess', 0777);
++      unlink("$f/.htaccess");
++    }
++    foreach(glob($f.'/*') as $sf) {
++      if (is_dir($sf) && !is_link($sf)) {
++		multisite_manager_deltree($sf);
++      } else {
++		unlink($sf);
++      }
+     }
+   }
++  rmdir($f);
+ }
++/* For deletion of folders after subsite deletion. - End */
+ 
+-/*
+- * multisite_manager_admin_file_settingsdotphp
+- * @return string of PHP code that would be included based on the default settings for link/database name
++/**
++ * Implementation of hook_load().
+  */
+-function multisite_manager_admin_file_settingsdotphp() {
+-  global $base_url;
+-  $link = variable_get('multisite_manager_link_default', '');
+-  ///
+-  $fakenode = new stdClass();
+-  $fakenode->shortname = '". $my_site_base ."';
+-  $fakenode->db_prefix = variable_get('multisite_manager_dbprefix_default', '');
+-  $fakenode->db_user = '';
+-  $fakenode->db_pass = '<b style="color:red">DATABASE_PASSWORD</b>';
+-  $fakenode->db_path = variable_get('multisite_manager_dbpath_default', '');
+-  $newdb = _multisite_manager_dbobj($fakenode);
+-
+-  $recommended_directory = '';
+-
+-  if (!$link || !$fakenode->db_path) {
+-    return "ERROR: no link or db url";
+-  }
+-  $link = str_replace('{base_url}', $base_url, $link);
+-
+-  //$url_pieces[2] is hostname, $url_pieces[3] is path
+-  $url_pieces = explode('/', $link, 4);
+-
+-  $rv = array('<p>Based on your configuration in '.l( 'Multisite Manager Defaults','admin/settings/multisite_manager/defaults').' The following code should be added to a special settings.php file which .  Note, <b>This is an experimental feature</b> and you should look over this carefully before adding it in place of the database configuration (Also, please '.l('report suggestions/issues','http://drupal.org/project/multisite_manager') .').</p><blockquote><pre><code>',
+-	      '$matches = FALSE;');
+-  
+-  $host_regex = str_replace('{shortname}', '(\w+)', $url_pieces[2]);
+-  $path_regex = str_replace('{shortname}', '(\w+)', $url_pieces[3]);
+-
+-  //assumes shortname will never be the TLD
+-  $recommended_directory = preg_replace('|\(\\w\+\)[^.]*\.|','',$host_regex);
+-  ///shortname in hostname
+-  if (strpos($url_pieces[2],'{shortname}') !== FALSE) {
+-    $rv[] = 'if (preg_match("|'. $host_regex .'|",$_SERVER["HTTP_HOST"], $matches)';
+-    $rv[] = '    && preg_match("|'. $path_regex .'|",request_uri())';
+-    $rv[] = '    && $matches)';
+-    $rv[] = '{';
+-  }///shortname in path
+-  elseif (strpos($url_pieces[3],'{shortname}') !== FALSE) {
+-    $rv[] = 'if (preg_match("|'. $host_regex .'|",$_SERVER["HTTP_HOST"])';
+-    $rv[] = '    && preg_match("|'. $path_regex .'|",request_uri(), $matches)';
+-    $rv[] = '    && $matches)';
+-    $rv[] = '{';
+-    $recommended_directory .= '.' . str_replace('/','.',preg_replace('|(/[^/]*)?\(\\\w\+\)([^/]*)|','',$path_regex));
+-  }
+-  else {
+-    ///{shortname} has to appear in the link somewhere!
+-    return "ERROR: shortname must be in the link template " .$url_pieces[2] .'XX' . $url_pieces[3];
+-  }
+-  $rv[] = '  $my_site_base = $matches[1];';
+-
+-  ///prefix
+-  $rv[] = '  $db_prefix = "' . $newdb['prefix'] .'";';
+-  ///needs URL structure
+-  $rv[] = '  $base_url = "'. str_replace('{shortname}','". $my_site_base ."',$link) .'";  // NO trailing slash!';
+-
+-  ///needs newDB URI structure
+-  $rv[] = '  $db_url = "' .$newdb['url'] .'";';
+-
+-  $rv[] = '  ///This assumes you have a ./files directory in your base drupal directory';
+-  $rv[] = '  $conf = array(';
+-  $rv[] = '	"file_directory_path" => "files/".$my_site_base,';
+-  $rv[] = '  );';
+-  $rv[] = '}';
+-
+-  $rv[] = "</code></pre></blockquote>";
+-  $rv[] = 'Suggested directory under sites/ to include settings.php file: <b>' . $recommended_directory . "</b></p>";
+-  return implode("\n",$rv);
+-}
+-
+-function multisite_manager_admin_settings() {
+-  $defaults = array('db_prefix' => '{shortname}_',
+-		    'db_path' => '',
+-		    'link' => '{base_url}/site/{shortname}',
+-		    'admin_account' => 'copy creator',
+-		    'profile' => 'default',
+-		    'install_immediate' => TRUE,
+-		    'run_cron' => 0,
+-		    );
+-  $form['multisite_manager_run_cron'] = array(
+-    '#type' => 'checkbox',
+-    '#title' => t('Run drupal sites\' cron jobs'),
+-    '#required' => FALSE,
+-    '#default_value' => variable_get('multisite_manager_run_cron', $defaults['run_cron']),
+-    '#description' => t('This sets whether each drupal site\'s cron jobs will be run when this master site\'s cron is run.  If this is unset no drupal site will have their cron jobs executed regardless of each individual sites\' settings for running cron jobs.')
+-  );
+-  $form['multisite_manager_install_immediate'] = array(
+-    '#type' => 'checkbox',
+-    '#title' => t('Install site upon node creation'),
+-    '#required' => FALSE,
+-    '#default_value' => variable_get('multisite_manager_install_immediate', $defaults['install_immediate']),
+-    '#description' => t('This sets whether Drupal site\'s creation is done upon node creation or wether it is delayed until the batch create script is run.')
+-  );
+-  $form['multisite_manager_dbprefix_default'] = array(
+-    '#type' => 'textfield',
+-    '#title' => t('Table prefix default'),
+-    '#required' => FALSE,
+-    '#default_value' => variable_get('multisite_manager_dbprefix_default', $defaults['db_prefix']),
+-    '#description' => t('This is the default prefix that will be forced on those without "advanced database setup" rights. {shortname} stands for the shortname field input when creating the site.  If you make the default database different from the current one, you can reasonably make this empty.')
+-  );
+-  $form['multisite_manager_dbpath_default'] = array(
+-    '#type' => 'textfield',
+-    '#title' => t('Database name default'),
+-    '#required' => FALSE,
+-    '#default_value' => variable_get('multisite_manager_dbpath_default', $defaults['db_path']),
+-    '#description' => t('If left blank, it will use the current database.  Otherwise, "{shortname}" will be replaced, so another common default might be "{shortname}_drupal". Do NOT set this unless the current database account has CREATE access in MySQL or CREATEDB access in Postgres. To ensure database data is not overwritten, if you install in another database, it is either required that your current database have some db_prefix OR that it will be a new database--i.e. that your entry here includes "{shortname}".'),
+-  );
+-  $form['multisite_manager_link_default'] = array(
+-    '#type' => 'textfield',
+-    '#title' => t('Link default'),
+-    '#required' => FALSE,
+-    '#default_value' => variable_get('multisite_manager_link_default', $defaults['link']),
+-    '#description' => t('This is where the site will be accessible by default.  If you setup your ./sites/default/settings.php correctly along with your web server (e.g. apache/htaccess) config, you can anticipate where the new site will live and forward the user to the new site location upon creation.  Here, there are two dynamic variables, {base_url} and {shortname}.')
+-  );
+-  $form['multisite_manager_admin_account'] = array(
+-    '#type' => 'radios',
+-    '#title' => t('Admin account on new sites'),
+-    '#required' => TRUE,
+-    '#options' => array(
+-			'copy admin' => t('Copy the admin account from this site'),
+-			'copy creator' => t('Copy the account of the creator'),
+-			'do nothing' => t('Do nothing (only choose this if all profiles available do something instead.  the default profile does not)'),
+-			/*'prompt creator' => '',*/
+-			),
+-    '#default_value' => variable_get('multisite_manager_admin_account', $defaults['admin_account']),
+-  );
+-  $form['multisite_manager_profile_default'] = array(
+-    '#type' => 'radios',
+-    '#title' => t('Profile default'),
+-    '#required' => FALSE,
+-    '#options' => _multisite_manager_profile_options(),
+-    '#default_value' => variable_get('multisite_manager_profile_default', $defaults['profile']),
+-  );
+-
+-  return system_settings_form($form);
++function multisite_manager_load($node) {
++  $additions = db_fetch_object(db_query('SELECT shortname, profile, link, installed, run_cron, db_prefix, db_user, db_path, mail, givenname, surname FROM {drupal_site} WHERE vid = %d', $node->vid));
++  return $additions;
+ }
+ 
+ /**
+  * Gets the node url from the link
+- * 
++ *
+  * @param object $node
+  * @return object
+  */
+ function _multisite_manager_node_url($node) {
+-  global $base_url;
++  global $conf;
+   if ($node->link) {
+-    $node->url = str_replace('{base_url}', $base_url, $node->link);
+-    $node->url = str_replace('{shortname}', $node->shortname, $node->url);
++    $node->url = str_replace('{shortname}', 'http://' . $node->shortname, $node->link);
++    $node->url = str_replace('{base_url}', $conf['_lifedesks_domain'], $node->url);
+   } // end if node link
+ 
+   return $node;
+@@ -1027,4 +1098,15 @@ function theme_multisite_manager_sitelink($node) {
+   return l($node->title .' '. t('Site'), $node->url);
+ }
+ 
+-// vim:fenc=utf-8:ft=php:ai:si:ts=2:sw=2:et:
++/**
++ * Implementation of hook_mail
++ */
++function multisite_manager_mail($key, &$message, $params) {
++
++  switch($key) {
++    case 'direct':
++      $message['subject'] = $params['subject'];
++      $message['body'][] = $params['body'];
++    break;
++  }
++}
